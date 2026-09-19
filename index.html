@@ -488,7 +488,7 @@
         .map((label, i) => `<option value="${i + 2}">${escapeHtml(String(label))}</option>`)
         .join("");
       colSelect.innerHTML = colHeaders
-        .map((label, i) => `<option value="${i + 2}">${escapeHtml(String(label))}</option>`)
+        .map((label, i) => `<option value="${i + 2}">${colToLetter(i + 2)} - ${escapeHtml(String(label))}</option>`)
         .join("");
 
       selectorCard.style.display = "";
