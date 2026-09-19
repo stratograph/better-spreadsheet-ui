@@ -156,29 +156,6 @@
     background: #e8f0ff;
     color: var(--accent-dark);
   }
-  .setup-steps {
-    font-size: 12px;
-    color: var(--muted);
-    line-height: 1.5;
-    padding-left: 18px;
-    margin: 6px 0 0 0;
-  }
-  .setup-steps li { margin-bottom: 6px; }
-  .setup-steps code {
-    background: #f1f1f3;
-    padding: 1px 4px;
-    border-radius: 4px;
-    font-size: 11px;
-    word-break: break-all;
-  }
-  #origin-display {
-    font-size: 11px;
-    background: #f1f1f3;
-    padding: 6px 8px;
-    border-radius: 6px;
-    word-break: break-all;
-    margin-top: 6px;
-  }
   .field-label {
     display: flex;
     justify-content: space-between;
@@ -197,19 +174,6 @@
 <h1>Sheet Cell Editor</h1>
 
 <div id="globalMessage"></div>
-
-<details class="card" id="setupDetails">
-  <summary>First-time setup</summary>
-  <ol class="setup-steps">
-    <li>In <a href="https://console.cloud.google.com/" target="_blank" rel="noopener">Google Cloud Console</a>, create a project (or use an existing one) and enable the <strong>Google Sheets API</strong>.</li>
-    <li>Configure the OAuth consent screen (External, your own email as test user is fine).</li>
-    <li>Create an OAuth Client ID of type <strong>Web application</strong>.</li>
-    <li>Add this page's origin as an Authorized JavaScript origin:
-      <div id="origin-display"></div>
-    </li>
-    <li>Paste the Client ID and your target Spreadsheet ID into Settings below, then Sign in.</li>
-  </ol>
-</details>
 
 <div class="card" id="selectorCard" style="display:none;">
   <label for="rowSelect">Row</label>
@@ -293,8 +257,6 @@
   const justSheetNameInput = el("justSheetName");
   const saveSettingsBtn = el("saveSettingsBtn");
   const settingsDetails = el("settingsDetails");
-  const setupDetails = el("setupDetails");
-  const originDisplay = el("origin-display");
 
   const authStatus = el("authStatus");
   const signInBtn = el("signInBtn");
@@ -318,8 +280,6 @@
   const emptyHint = el("emptyHint");
   const footerBar = el("footerBar");
   const footerSpacer = el("footerSpacer");
-
-  originDisplay.textContent = window.location.origin;
 
   function syncFooterSpacer() {
     footerSpacer.style.height = footerBar.offsetHeight + "px";
@@ -377,8 +337,6 @@
   populateSettingsForm();
   if (!settingsComplete()) {
     settingsDetails.setAttribute("open", "");
-  } else {
-    setupDetails.removeAttribute("open");
   }
 
   saveSettingsBtn.addEventListener("click", () => {
@@ -441,7 +399,6 @@
     valueCard.style.display = "none";
     justCard.style.display = "none";
     emptyHint.style.display = "";
-    setupDetails.style.display = "";
     syncFooterSpacer();
   }
 
@@ -449,7 +406,6 @@
     authStatus.textContent = "Signed in";
     signInBtn.style.display = "none";
     signOutBtn.style.display = "";
-    setupDetails.style.display = "none";
     showMessage("", null);
     if (!settingsComplete()) {
       showMessage("Fill in all Settings fields, then Save Settings.", "error");
