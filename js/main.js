@@ -36,6 +36,8 @@ const valueStatus = el("valueStatus");
 const justStatus = el("justStatus");
 const valueFormulaNote = el("valueFormulaNote");
 const justFormulaNote = el("justFormulaNote");
+const valueSaveError = el("valueSaveError");
+const justSaveError = el("justSaveError");
 const addClipboardBtn = el("addClipboardBtn");
 
 const globalMessage = el("globalMessage");
@@ -144,6 +146,8 @@ function updateSignedOutUI() {
   emptyHint.style.display = "";
   rowSelectLabel.textContent = "Row";
   addClipboardBtn.style.display = "none";
+  clearSaveError(valueSaveError, [valueBox, valueSelect]);
+  clearSaveError(justSaveError, [justBox]);
   syncFooterSpacer();
 }
 
@@ -376,6 +380,8 @@ async function loadCellValues() {
   valueFormulaNote.style.display = "none";
   justFormulaNote.style.display = "none";
   addClipboardBtn.style.display = "none";
+  clearSaveError(valueSaveError, [valueBox, valueSelect]);
+  clearSaveError(justSaveError, [justBox]);
   try {
     const [v, j] = await Promise.all([
       getCell(settings.sheetId, settings.valueSheetName, a1, accessToken),
@@ -398,19 +404,31 @@ async function loadCellValues() {
   }
 }
 
-async function saveCell(sheetName, a1, value, statusEl) {
+function clearSaveError(errorNoteEl, controlEls) {
+  errorNoteEl.style.display = "none";
+  controlEls.forEach((c) => c.classList.remove("has-save-error"));
+}
+
+function showSaveError(errorNoteEl, controlEls) {
+  errorNoteEl.style.display = "";
+  controlEls.forEach((c) => c.classList.add("has-save-error"));
+}
+
+async function saveCell(sheetName, a1, value, statusEl, errorNoteEl, controlEls) {
   statusEl.textContent = "Saving...";
   statusEl.className = "field-status";
   try {
     await writeCell(settings.sheetId, sheetName, a1, value, accessToken);
     statusEl.textContent = "Saved";
     statusEl.className = "field-status ok";
+    clearSaveError(errorNoteEl, controlEls);
     setTimeout(() => {
       if (statusEl.textContent === "Saved") statusEl.textContent = "";
     }, 1500);
   } catch (err) {
-    statusEl.textContent = "Error saving";
+    statusEl.textContent = "Not saved";
     statusEl.className = "field-status error";
+    showSaveError(errorNoteEl, controlEls);
     handleFetchError(err, "saving cell");
   }
 }
@@ -427,7 +445,7 @@ function saveValueField() {
   const a1 = currentA1();
   if (!a1 || suppressAutoSave || valueIsFormula) return;
   const value = currentValueIsSelectType() ? valueSelect.value : valueBox.value;
-  saveCell(settings.valueSheetName, a1, value, valueStatus);
+  saveCell(settings.valueSheetName, a1, value, valueStatus, valueSaveError, [valueBox, valueSelect]);
 }
 
 const debouncedSaveValue = debounce(saveValueField, 700);
@@ -435,7 +453,7 @@ const debouncedSaveValue = debounce(saveValueField, 700);
 const debouncedSaveJust = debounce(() => {
   const a1 = currentA1();
   if (!a1 || suppressAutoSave || justIsFormula) return;
-  saveCell(settings.justSheetName, a1, justBox.value, justStatus);
+  saveCell(settings.justSheetName, a1, justBox.value, justStatus, justSaveError, [justBox]);
 }, 700);
 
 valueBox.addEventListener("input", () => {
