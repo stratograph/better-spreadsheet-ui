@@ -300,7 +300,7 @@ function updateCompletion() {
     }
   }
   completionFill.style.width = (total > 0 ? (completed / total) * 100 : 0) + "%";
-  completionLabel.textContent = `${completed} / ${total} fields`;
+  completionLabel.textContent = `${completed} / ${total} fields completed`;
 }
 
 function updateFieldMetadata() {

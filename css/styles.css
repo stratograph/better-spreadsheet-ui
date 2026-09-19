@@ -74,8 +74,20 @@ details.card[open] summary { margin-bottom: 10px; }
   font-weight: 600;
   color: var(--muted);
   list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .accordion summary::-webkit-details-marker { display: none; }
+.accordion summary::before {
+  content: "\25B8";
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 150ms ease;
+}
+.accordion[open] summary::before {
+  transform: rotate(90deg);
+}
 .accordion[open] summary { margin-bottom: 6px; }
 .accordion-body {
   font-size: 13px;
