@@ -99,6 +99,15 @@
     <label for="metadataSheetName">Metadata tab name</label>
     <input type="text" id="metadataSheetName" placeholder="Metadata" autocomplete="off" />
 
+    <div class="checkbox-row">
+      <input type="checkbox" id="extraChangeLogging" />
+      <label for="extraChangeLogging" style="margin:0;">Extra change logging</label>
+    </div>
+    <div class="disabled-hint" style="text-align:left; padding:4px 0 0 0;">Logs old/new values with timestamps to a hidden tab, separate from Google's built-in version history.</div>
+
+    <label for="historySheetName">History tab name</label>
+    <input type="text" id="historySheetName" placeholder="Edit History" autocomplete="off" />
+
     <div class="row" style="margin-top: 12px;">
       <button id="saveSettingsBtn">Save Settings</button>
     </div>

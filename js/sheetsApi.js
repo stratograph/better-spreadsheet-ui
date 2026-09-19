@@ -70,3 +70,41 @@ export async function writeCell(sheetId, sheetName, a1, value, token) {
     body: JSON.stringify({ values: [[value]] }),
   });
 }
+
+export async function getSheetTitles(sheetId, token) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?fields=${encodeURIComponent(
+    "sheets.properties(title,hidden)"
+  )}`;
+  const data = await apiFetch(url, token);
+  return (data.sheets || []).map((s) => s.properties);
+}
+
+export async function addHiddenSheet(sheetId, title, token) {
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}:batchUpdate`;
+  const data = await apiFetch(url, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ requests: [{ addSheet: { properties: { title, hidden: true } } }] }),
+  });
+  return data.replies[0].addSheet.properties;
+}
+
+export async function writeHeaderRow(sheetId, sheetName, headerValues, token) {
+  const range = encodeURIComponent(`${sheetName}!A1`);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}?valueInputOption=USER_ENTERED`;
+  await apiFetch(url, token, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ values: [headerValues] }),
+  });
+}
+
+export async function appendRow(sheetId, sheetName, rowValues, token) {
+  const range = encodeURIComponent(sheetName);
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/${range}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+  await apiFetch(url, token, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ values: [rowValues] }),
+  });
+}

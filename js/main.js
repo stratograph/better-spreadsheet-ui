@@ -1,7 +1,19 @@
 import { loadSettings, saveSettings, isSettingsComplete } from "./settings.js";
-import { colToLetter, getSheetValues, getCell, writeCell, AuthError } from "./sheetsApi.js";
+import {
+  colToLetter,
+  getSheetValues,
+  getCell,
+  writeCell,
+  getSheetTitles,
+  addHiddenSheet,
+  writeHeaderRow,
+  appendRow,
+  AuthError,
+} from "./sheetsApi.js";
 import { createTokenClient, revokeToken } from "./auth.js";
 import { normalizeKey, buildMetadataMap, isSelectFieldType } from "./metadata.js";
+
+const HISTORY_HEADER = ["Row name", "Column name", "Value or Justification", "Old value", "New value", "Edit timestamp"];
 
 const SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
@@ -11,6 +23,8 @@ const sheetIdInput = el("sheetId");
 const valueSheetNameInput = el("valueSheetName");
 const justSheetNameInput = el("justSheetName");
 const metadataSheetNameInput = el("metadataSheetName");
+const extraChangeLoggingInput = el("extraChangeLogging");
+const historySheetNameInput = el("historySheetName");
 const saveSettingsBtn = el("saveSettingsBtn");
 const settingsDetails = el("settingsDetails");
 
@@ -67,6 +81,10 @@ let valueIsFormula = false;
 let justIsFormula = false;
 let committedRowValue = "";
 let committedColValue = "";
+let cellLoadSnapshot = null;
+let valueLastSaved = "";
+let justLastSaved = "";
+let historySheetReady = false;
 
 function populateSettingsForm() {
   clientIdInput.value = settings.clientId;
@@ -74,6 +92,8 @@ function populateSettingsForm() {
   valueSheetNameInput.value = settings.valueSheetName;
   justSheetNameInput.value = settings.justSheetName;
   metadataSheetNameInput.value = settings.metadataSheetName;
+  extraChangeLoggingInput.checked = settings.extraChangeLogging;
+  historySheetNameInput.value = settings.historySheetName;
 }
 
 function showMessage(text, type) {
@@ -98,10 +118,13 @@ saveSettingsBtn.addEventListener("click", () => {
     valueSheetName: valueSheetNameInput.value.trim() || "Value",
     justSheetName: justSheetNameInput.value.trim() || "Justification",
     metadataSheetName: metadataSheetNameInput.value.trim() || "Metadata",
+    extraChangeLogging: extraChangeLoggingInput.checked,
+    historySheetName: historySheetNameInput.value.trim() || "Edit History",
   };
   saveSettings(settings);
   showMessage("Settings saved.", "info");
   tokenClient = null; // force re-init with new client id on next sign-in
+  historySheetReady = false; // re-check/create in case logging or the tab name changed
   if (accessToken && isSettingsComplete(settings)) {
     loadSheetStructure();
   }
@@ -133,11 +156,13 @@ signInBtn.addEventListener("click", () => {
   client.requestAccessToken({ prompt: "consent" });
 });
 
-signOutBtn.addEventListener("click", () => {
+signOutBtn.addEventListener("click", async () => {
+  await flushHistoryForOutgoingCell();
   if (accessToken) {
     revokeToken(accessToken);
   }
   accessToken = null;
+  cellLoadSnapshot = null;
   updateSignedOutUI();
 });
 
@@ -423,6 +448,7 @@ function autosizeValueBox() {
 async function loadCellValues() {
   const a1 = currentA1();
   if (!a1) return;
+  await flushHistoryForOutgoingCell();
   updateFieldMetadata();
   updateCompletion();
   suppressAutoSave = true;
@@ -457,6 +483,14 @@ async function loadCellValues() {
     applyValueState(v);
     applyJustificationState(j);
     if (!currentValueIsSelectType()) autosizeValueBox();
+    cellLoadSnapshot = {
+      rowName: String(rowLabels[currentRowIndex()] ?? "").trim(),
+      colName: currentColumnName(),
+      value: v.formatted,
+      justification: j.formatted,
+    };
+    valueLastSaved = v.formatted;
+    justLastSaved = j.formatted;
   } catch (err) {
     valueBox.disabled = false;
     justBox.disabled = false;
@@ -515,20 +549,57 @@ async function saveValueField() {
   const rowIdx = currentRowIndex();
   const colIdx = Number(colSelect.value) - 1;
   const ok = await saveCell(settings.valueSheetName, a1, value, valueStatus, valueSaveError, [valueBox, valueSelect]);
-  if (ok && rowIdx >= 0) {
-    if (!valueGrid[rowIdx]) valueGrid[rowIdx] = [];
-    valueGrid[rowIdx][colIdx] = value;
-    updateCompletion();
+  if (ok) {
+    valueLastSaved = value;
+    if (rowIdx >= 0) {
+      if (!valueGrid[rowIdx]) valueGrid[rowIdx] = [];
+      valueGrid[rowIdx][colIdx] = value;
+      updateCompletion();
+    }
   }
 }
 
 const debouncedSaveValue = debounce(saveValueField, 700);
 
-const debouncedSaveJust = debounce(() => {
+const debouncedSaveJust = debounce(async () => {
   const a1 = currentA1();
   if (!a1 || suppressAutoSave || justIsFormula) return;
-  saveCell(settings.justSheetName, a1, justBox.value, justStatus, justSaveError, [justBox]);
+  const ok = await saveCell(settings.justSheetName, a1, justBox.value, justStatus, justSaveError, [justBox]);
+  if (ok) justLastSaved = justBox.value;
 }, 700);
+
+async function ensureHistorySheet() {
+  if (historySheetReady) return;
+  const titles = await getSheetTitles(settings.sheetId, accessToken);
+  const exists = titles.some((p) => p.title === settings.historySheetName);
+  if (!exists) {
+    await addHiddenSheet(settings.sheetId, settings.historySheetName, accessToken);
+    await writeHeaderRow(settings.sheetId, settings.historySheetName, HISTORY_HEADER, accessToken);
+  }
+  historySheetReady = true;
+}
+
+async function flushHistoryForOutgoingCell() {
+  if (!settings.extraChangeLogging || !cellLoadSnapshot) return;
+  const snapshot = cellLoadSnapshot;
+  const timestamp = new Date().toISOString();
+  const entries = [];
+  if (valueLastSaved !== snapshot.value) {
+    entries.push([snapshot.rowName, snapshot.colName, "Value", snapshot.value, valueLastSaved, timestamp]);
+  }
+  if (justLastSaved !== snapshot.justification) {
+    entries.push([snapshot.rowName, snapshot.colName, "Justification", snapshot.justification, justLastSaved, timestamp]);
+  }
+  if (entries.length === 0) return;
+  try {
+    await ensureHistorySheet();
+    for (const row of entries) {
+      await appendRow(settings.sheetId, settings.historySheetName, row, accessToken);
+    }
+  } catch (err) {
+    console.error("logging change history", err);
+  }
+}
 
 valueBox.addEventListener("input", () => {
   autosizeValueBox();

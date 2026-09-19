@@ -130,6 +130,19 @@ label {
   margin-top: 10px;
 }
 label:first-of-type { margin-top: 0; }
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+}
+.checkbox-row input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+.checkbox-row label {
+  margin: 0;
+}
 input[type="text"], select, textarea {
   width: 100%;
   font-size: 14px;

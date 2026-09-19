@@ -6,6 +6,8 @@ const DEFAULTS = {
   valueSheetName: "Value",
   justSheetName: "Justification",
   metadataSheetName: "Metadata",
+  extraChangeLogging: false,
+  historySheetName: "Edit History",
 };
 
 export function loadSettings() {
@@ -18,6 +20,8 @@ export function loadSettings() {
       valueSheetName: parsed.valueSheetName || DEFAULTS.valueSheetName,
       justSheetName: parsed.justSheetName || DEFAULTS.justSheetName,
       metadataSheetName: parsed.metadataSheetName || DEFAULTS.metadataSheetName,
+      extraChangeLogging: !!parsed.extraChangeLogging,
+      historySheetName: parsed.historySheetName || DEFAULTS.historySheetName,
     };
   } catch (e) {
     return { ...DEFAULTS };
