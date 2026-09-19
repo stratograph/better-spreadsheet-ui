@@ -328,6 +328,16 @@ function updateCompletion() {
   completionLabel.textContent = `${completed} / ${total} fields completed`;
 }
 
+function buildMetadataDescriptionText(meta) {
+  const blocks = [];
+  if (meta.description) blocks.push(meta.description);
+  if (meta.possibleValues.length > 0 && !isSelectFieldType(meta.fieldType)) {
+    const list = meta.possibleValues.map((v) => ` - ${v}`).join("\n");
+    blocks.push(`Possible values:\n${list}`);
+  }
+  return blocks.length > 0 ? blocks.join("\n\n") : "(No description provided.)";
+}
+
 function updateFieldMetadata() {
   const key = normalizeKey(currentColumnName());
   currentFieldMeta = metadataByName[key] || null;
@@ -335,7 +345,7 @@ function updateFieldMetadata() {
   if (currentFieldMeta) {
     metadataMissingNote.style.display = "none";
     metadataAccordion.style.display = "";
-    metadataDescription.textContent = currentFieldMeta.description || "(No description provided.)";
+    metadataDescription.textContent = buildMetadataDescriptionText(currentFieldMeta);
   } else {
     metadataMissingNote.style.display = "";
     metadataAccordion.style.display = "none";
