@@ -36,6 +36,7 @@ const valueStatus = el("valueStatus");
 const justStatus = el("justStatus");
 const valueFormulaNote = el("valueFormulaNote");
 const justFormulaNote = el("justFormulaNote");
+const addClipboardBtn = el("addClipboardBtn");
 
 const globalMessage = el("globalMessage");
 const emptyHint = el("emptyHint");
@@ -142,6 +143,7 @@ function updateSignedOutUI() {
   justCard.style.display = "none";
   emptyHint.style.display = "";
   rowSelectLabel.textContent = "Row";
+  addClipboardBtn.style.display = "none";
   syncFooterSpacer();
 }
 
@@ -263,7 +265,37 @@ function applyJustificationState(cell) {
   justBox.value = cell.formatted;
   justBox.disabled = cell.isFormula;
   justFormulaNote.style.display = cell.isFormula ? "" : "none";
+  refreshClipboardButton();
 }
+
+async function refreshClipboardButton() {
+  if (justBox.disabled || justCard.style.display === "none") {
+    addClipboardBtn.style.display = "none";
+    return;
+  }
+  try {
+    const text = await navigator.clipboard.readText();
+    addClipboardBtn.style.display = text && text.trim() ? "" : "none";
+  } catch (e) {
+    addClipboardBtn.style.display = "none";
+  }
+}
+
+window.addEventListener("focus", () => {
+  if (justCard.style.display !== "none") refreshClipboardButton();
+});
+
+addClipboardBtn.addEventListener("click", async () => {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text) return;
+    const separator = justBox.value && !justBox.value.endsWith("\n") ? "\n" : "";
+    justBox.value = justBox.value + separator + text;
+    justBox.dispatchEvent(new Event("input", { bubbles: true }));
+  } catch (e) {
+    showMessage("Couldn't read clipboard contents.", "error");
+  }
+});
 
 function applyValueState(cell) {
   const useSelect = currentValueIsSelectType();
@@ -343,6 +375,7 @@ async function loadCellValues() {
   justStatus.textContent = "";
   valueFormulaNote.style.display = "none";
   justFormulaNote.style.display = "none";
+  addClipboardBtn.style.display = "none";
   try {
     const [v, j] = await Promise.all([
       getCell(settings.sheetId, settings.valueSheetName, a1, accessToken),
