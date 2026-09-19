@@ -515,19 +515,29 @@
   async function loadCellValues() {
     const a1 = currentA1();
     if (!a1) return;
+    suppressAutoSave = true;
+    valueBox.value = "";
+    justBox.value = "";
+    valueBox.disabled = true;
+    justBox.disabled = true;
+    valueBox.placeholder = "Loading...";
+    justBox.placeholder = "Loading...";
+    valueStatus.textContent = "";
+    justStatus.textContent = "";
     try {
-      suppressAutoSave = true;
       const [v, j] = await Promise.all([
         getCell(settings.valueSheetName, a1),
         getCell(settings.justSheetName, a1),
       ]);
       valueBox.value = v;
       justBox.value = j;
-      valueStatus.textContent = "";
-      justStatus.textContent = "";
     } catch (err) {
       handleFetchError(err, "loading cell values");
     } finally {
+      valueBox.disabled = false;
+      justBox.disabled = false;
+      valueBox.placeholder = "Cell contents";
+      justBox.placeholder = "Cell contents";
       suppressAutoSave = false;
     }
   }
