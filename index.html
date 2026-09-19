@@ -13,10 +13,19 @@
 
 <div id="globalMessage"></div>
 
-<div class="card" id="selectorCard" style="display:none;">
+<div class="card" id="initiativeCard" style="display:none;">
   <label for="rowSelect" id="rowSelectLabel">Row</label>
   <select id="rowSelect"></select>
 
+  <div class="progress-wrap">
+    <div class="progress-track">
+      <div class="progress-fill" id="completionFill"></div>
+    </div>
+    <div class="progress-label" id="completionLabel">0 / 0 fields</div>
+  </div>
+</div>
+
+<div class="card" id="fieldCard" style="display:none;">
   <label for="colSelect">Field</label>
   <select id="colSelect"></select>
 

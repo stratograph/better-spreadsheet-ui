@@ -18,11 +18,14 @@ const authStatus = el("authStatus");
 const signInBtn = el("signInBtn");
 const signOutBtn = el("signOutBtn");
 
-const selectorCard = el("selectorCard");
+const initiativeCard = el("initiativeCard");
+const fieldCard = el("fieldCard");
 const rowSelectLabel = el("rowSelectLabel");
 const rowSelect = el("rowSelect");
 const colSelect = el("colSelect");
 const reloadBtn = el("reloadBtn");
+const completionFill = el("completionFill");
+const completionLabel = el("completionLabel");
 const metadataMissingNote = el("metadataMissingNote");
 const metadataAccordion = el("metadataAccordion");
 const metadataDescription = el("metadataDescription");
@@ -56,6 +59,7 @@ let tokenClient = null;
 let accessToken = null;
 let rowLabels = [];
 let colHeaders = [];
+let valueGrid = [];
 let metadataByName = {};
 let currentFieldMeta = null;
 let suppressAutoSave = false;
@@ -142,7 +146,8 @@ function updateSignedOutUI() {
   signInBtn.style.display = "";
   signOutBtn.style.display = "none";
   reloadBtn.style.display = "none";
-  selectorCard.style.display = "none";
+  initiativeCard.style.display = "none";
+  fieldCard.style.display = "none";
   valueCard.style.display = "none";
   justCard.style.display = "none";
   emptyHint.style.display = "";
@@ -190,11 +195,13 @@ async function loadSheetStructure() {
     const values = await getSheetValues(settings.sheetId, settings.valueSheetName, accessToken);
     const headerRow = values[0] || [];
     colHeaders = headerRow.slice(1);
-    rowLabels = values.slice(1).map((r) => (r && r[0] !== undefined ? r[0] : ""));
+    valueGrid = values.slice(1);
+    rowLabels = valueGrid.map((r) => (r && r[0] !== undefined ? r[0] : ""));
 
     if (rowLabels.length === 0 || colHeaders.length === 0) {
       showMessage("Sheet loaded but no rows/columns found. Check tab name and layout.", "error");
-      selectorCard.style.display = "none";
+      initiativeCard.style.display = "none";
+      fieldCard.style.display = "none";
       valueCard.style.display = "none";
       justCard.style.display = "none";
       emptyHint.style.display = "";
@@ -222,7 +229,8 @@ async function loadSheetStructure() {
       showMessage("Sheet loaded, but field metadata failed to load. Check the metadata tab name.", "error");
     }
 
-    selectorCard.style.display = "";
+    initiativeCard.style.display = "";
+    fieldCard.style.display = "";
     valueCard.style.display = "";
     justCard.style.display = "";
     emptyHint.style.display = "none";
@@ -273,6 +281,26 @@ function currentColumnName() {
   const idx = Number(colSelect.value) - 2;
   if (Number.isNaN(idx) || idx < 0 || idx >= colHeaders.length) return "";
   return String(colHeaders[idx] == null ? "" : colHeaders[idx]).trim();
+}
+
+function currentRowIndex() {
+  const idx = Number(rowSelect.value) - 2;
+  if (Number.isNaN(idx) || idx < 0 || idx >= valueGrid.length) return -1;
+  return idx;
+}
+
+function updateCompletion() {
+  const rowIdx = currentRowIndex();
+  const total = colHeaders.length;
+  let completed = 0;
+  if (rowIdx >= 0) {
+    const row = valueGrid[rowIdx] || [];
+    for (let col = 1; col <= total; col++) {
+      if (row[col] !== undefined && String(row[col]).trim() !== "") completed++;
+    }
+  }
+  completionFill.style.width = (total > 0 ? (completed / total) * 100 : 0) + "%";
+  completionLabel.textContent = `${completed} / ${total} fields`;
 }
 
 function updateFieldMetadata() {
@@ -396,6 +424,7 @@ async function loadCellValues() {
   const a1 = currentA1();
   if (!a1) return;
   updateFieldMetadata();
+  updateCompletion();
   suppressAutoSave = true;
 
   const useSelect = currentValueIsSelectType();
@@ -461,11 +490,13 @@ async function saveCell(sheetName, a1, value, statusEl, errorNoteEl, controlEls)
     setTimeout(() => {
       if (statusEl.textContent === "Saved") statusEl.textContent = "";
     }, 1500);
+    return true;
   } catch (err) {
     statusEl.textContent = "Not saved";
     statusEl.className = "field-status error";
     showSaveError(errorNoteEl, controlEls);
     handleFetchError(err, "saving cell");
+    return false;
   }
 }
 
@@ -477,11 +508,18 @@ function debounce(fn, ms) {
   };
 }
 
-function saveValueField() {
+async function saveValueField() {
   const a1 = currentA1();
   if (!a1 || suppressAutoSave || valueIsFormula) return;
   const value = currentValueIsSelectType() ? valueSelect.value : valueBox.value;
-  saveCell(settings.valueSheetName, a1, value, valueStatus, valueSaveError, [valueBox, valueSelect]);
+  const rowIdx = currentRowIndex();
+  const colIdx = Number(colSelect.value) - 1;
+  const ok = await saveCell(settings.valueSheetName, a1, value, valueStatus, valueSaveError, [valueBox, valueSelect]);
+  if (ok && rowIdx >= 0) {
+    if (!valueGrid[rowIdx]) valueGrid[rowIdx] = [];
+    valueGrid[rowIdx][colIdx] = value;
+    updateCompletion();
+  }
 }
 
 const debouncedSaveValue = debounce(saveValueField, 700);
