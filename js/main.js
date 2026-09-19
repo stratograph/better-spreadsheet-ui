@@ -61,6 +61,8 @@ let currentFieldMeta = null;
 let suppressAutoSave = false;
 let valueIsFormula = false;
 let justIsFormula = false;
+let committedRowValue = "";
+let committedColValue = "";
 
 function populateSettingsForm() {
   clientIdInput.value = settings.clientId;
@@ -208,6 +210,8 @@ async function loadSheetStructure() {
     colSelect.innerHTML = colHeaders
       .map((label, i) => `<option value="${i + 2}">${colToLetter(i + 2)} - ${escapeHtml(String(label))}</option>`)
       .join("");
+    committedRowValue = rowSelect.value;
+    committedColValue = colSelect.value;
 
     try {
       const metaValues = await getSheetValues(settings.sheetId, settings.metadataSheetName, accessToken);
@@ -231,8 +235,32 @@ async function loadSheetStructure() {
   }
 }
 
-rowSelect.addEventListener("change", loadCellValues);
-colSelect.addEventListener("change", loadCellValues);
+function hasUnsavedSaveError() {
+  return valueSaveError.style.display !== "none" || justSaveError.style.display !== "none";
+}
+
+function handleSelectorChange() {
+  if (hasUnsavedSaveError()) {
+    const proceed = window.confirm(
+      "⚠ UNSAVED CHANGE WILL BE LOST\n\n" +
+        "A change on this row/field FAILED TO SAVE to the spreadsheet. " +
+        "If you switch rows or fields now, that edit is gone for good — " +
+        "there is no way to get it back.\n\n" +
+        "Click Cancel to stay here and try saving again, or OK to permanently discard the unsaved change."
+    );
+    if (!proceed) {
+      rowSelect.value = committedRowValue;
+      colSelect.value = committedColValue;
+      return;
+    }
+  }
+  committedRowValue = rowSelect.value;
+  committedColValue = colSelect.value;
+  loadCellValues();
+}
+
+rowSelect.addEventListener("change", handleSelectorChange);
+colSelect.addEventListener("change", handleSelectorChange);
 
 function currentA1() {
   const row = rowSelect.value;
