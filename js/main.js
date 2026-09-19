@@ -300,6 +300,8 @@ function applyJustificationState(cell) {
   refreshClipboardButton();
 }
 
+let lastPastedClipboardText = null;
+
 async function refreshClipboardButton() {
   if (justBox.disabled || justCard.style.display === "none") {
     addClipboardBtn.style.display = "none";
@@ -307,7 +309,8 @@ async function refreshClipboardButton() {
   }
   try {
     const text = await navigator.clipboard.readText();
-    addClipboardBtn.style.display = text && text.trim() ? "" : "none";
+    const hasNewContent = text && text.trim() && text !== lastPastedClipboardText;
+    addClipboardBtn.style.display = hasNewContent ? "" : "none";
   } catch (e) {
     addClipboardBtn.style.display = "none";
   }
@@ -327,6 +330,8 @@ addClipboardBtn.addEventListener("click", async () => {
     justBox.selectionStart = justBox.selectionEnd = justBox.value.length;
     justBox.scrollTop = justBox.scrollHeight;
     justBox.dispatchEvent(new Event("input", { bubbles: true }));
+    lastPastedClipboardText = text;
+    addClipboardBtn.style.display = "none";
   } catch (e) {
     showMessage("Couldn't read clipboard contents.", "error");
   }
