@@ -17,6 +17,7 @@ const signInBtn = el("signInBtn");
 const signOutBtn = el("signOutBtn");
 
 const selectorCard = el("selectorCard");
+const rowSelectLabel = el("rowSelectLabel");
 const rowSelect = el("rowSelect");
 const colSelect = el("colSelect");
 const reloadBtn = el("reloadBtn");
@@ -130,6 +131,7 @@ function updateSignedOutUI() {
   valueCard.style.display = "none";
   justCard.style.display = "none";
   emptyHint.style.display = "";
+  rowSelectLabel.textContent = "Row";
   syncFooterSpacer();
 }
 
@@ -178,8 +180,11 @@ async function loadSheetStructure() {
       valueCard.style.display = "none";
       justCard.style.display = "none";
       emptyHint.style.display = "";
+      rowSelectLabel.textContent = "Row";
       return;
     }
+
+    rowSelectLabel.textContent = headerRow[0] || "Row";
 
     rowSelect.innerHTML = rowLabels
       .map((label, i) => `<option value="${i + 2}">${escapeHtml(String(label))}</option>`)
