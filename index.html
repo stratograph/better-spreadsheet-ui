@@ -505,11 +505,30 @@
 
   async function getCell(sheetName, a1) {
     const range = encodeURIComponent(`${sheetName}!${a1}`);
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${settings.sheetId}/values/${range}`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${settings.sheetId}/values/${range}?valueRenderOption=FORMULA`;
     const data = await apiFetch(url);
     return data.values && data.values[0] && data.values[0][0] !== undefined
       ? data.values[0][0]
       : "";
+  }
+
+  function isFormula(val) {
+    return typeof val === "string" && val.trim().startsWith("=");
+  }
+
+  let valueIsFormula = false;
+  let justIsFormula = false;
+
+  function applyFieldState(box, statusEl, val, isFormulaVal) {
+    box.disabled = isFormulaVal;
+    if (isFormulaVal) {
+      box.value = "";
+      box.placeholder = "Cannot edit formulas here";
+      statusEl.textContent = "";
+    } else {
+      box.value = val;
+      box.placeholder = "Cell contents";
+    }
   }
 
   async function loadCellValues() {
@@ -529,15 +548,17 @@
         getCell(settings.valueSheetName, a1),
         getCell(settings.justSheetName, a1),
       ]);
-      valueBox.value = v;
-      justBox.value = j;
+      valueIsFormula = isFormula(v);
+      justIsFormula = isFormula(j);
+      applyFieldState(valueBox, valueStatus, v, valueIsFormula);
+      applyFieldState(justBox, justStatus, j, justIsFormula);
     } catch (err) {
-      handleFetchError(err, "loading cell values");
-    } finally {
       valueBox.disabled = false;
       justBox.disabled = false;
       valueBox.placeholder = "Cell contents";
       justBox.placeholder = "Cell contents";
+      handleFetchError(err, "loading cell values");
+    } finally {
       suppressAutoSave = false;
     }
   }
@@ -575,13 +596,13 @@
 
   const debouncedSaveValue = debounce(() => {
     const a1 = currentA1();
-    if (!a1 || suppressAutoSave) return;
+    if (!a1 || suppressAutoSave || valueIsFormula) return;
     writeCell(settings.valueSheetName, a1, valueBox.value, valueStatus);
   }, 700);
 
   const debouncedSaveJust = debounce(() => {
     const a1 = currentA1();
-    if (!a1 || suppressAutoSave) return;
+    if (!a1 || suppressAutoSave || justIsFormula) return;
     writeCell(settings.justSheetName, a1, justBox.value, justStatus);
   }, 700);
 
