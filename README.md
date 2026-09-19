@@ -9,10 +9,12 @@ Live at: https://stratograph.io/better-spreadsheet-ui/
 
 ## How it works
 
-- **Row** dropdown is built from column A of the "Value" tab (the row labels).
-- **Column** dropdown is built from row 1 of the "Value" tab (the column headers), prefixed with the actual column letter.
-- The **Value** and **Justification** text boxes read/write the selected row+column cell in two separate, identically-shaped sheet tabs.
+- **Row** dropdown is built from column A of the "Value" tab (the row labels). Its label is taken from the tab's corner cell (row 1, column A), falling back to "Row" if that's blank.
+- **Field** dropdown is built from row 1 of the "Value" tab (the column headers), prefixed with the actual column letter.
+- The **Value** and **Justification** text boxes read/write the selected row+field cell in two separate, identically-shaped sheet tabs.
 - Cells containing a formula are shown (with their computed, formatted value) but disabled for editing.
+- A third **Metadata** tab (header row `Column name,Description,Field type,Possible values`) supplies per-field info: an accordion under the Field dropdown shows that field's Description (its open/closed state persists as you change rows/fields), and if a field has no matching metadata row, that's called out under the dropdown.
+- **Field type** in the metadata drives the Value control: blank or `text` behaves as a normal text box; anything else (e.g. `single-select`) renders Value as a dropdown populated from the newline-separated **Possible values**, plus a blank option. Matching the sheet's current value against that list is case-/whitespace-insensitive; a current value that doesn't match any listed option is shown as an extra, ephemeral entry (not saved back into the metadata's possible-values list).
 - Everything Google-specific (OAuth Client ID, Spreadsheet ID, tab names) is entered by the user in the app's Settings panel and stored only in that browser's `localStorage` — nothing sensitive is committed to this repo or embedded in the page.
 
 ## First-time setup
@@ -39,6 +41,7 @@ to those).
    - **Google OAuth Client ID** — from step 3
    - **Spreadsheet ID** — the long ID in the sheet's URL (`.../spreadsheets/d/<ID>/edit`)
    - **Value tab name** / **Justification tab name** — the two sheet tabs to read/write, sharing the same row/column layout
+   - **Metadata tab name** — the sheet tab with the `Column name,Description,Field type,Possible values` header row describing each field
 7. Sign in with Google. As a test user, you'll see a "Google hasn't verified this app" warning — click **Advanced → Go to stratograph.io (unsafe)** to proceed. This is expected for an unverified, internal-use app.
 
 ### Sharing with others

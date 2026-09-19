@@ -19,6 +19,13 @@
 
   <label for="colSelect">Field</label>
   <select id="colSelect"></select>
+
+  <div class="disabled-hint" id="metadataMissingNote" style="display:none;">No metadata found for this field.</div>
+
+  <details class="accordion" id="metadataAccordion" style="display:none;">
+    <summary>Description</summary>
+    <div class="accordion-body" id="metadataDescription"></div>
+  </details>
 </div>
 
 <div class="card" id="valueCard" style="display:none;">
@@ -27,6 +34,7 @@
     <span class="field-status" id="valueStatus"></span>
   </div>
   <textarea id="valueBox" rows="1" placeholder="Cell contents"></textarea>
+  <select id="valueSelect" style="display:none;"></select>
   <div class="formula-note" id="valueFormulaNote" style="display:none;">Cannot edit formulas here</div>
 </div>
 
@@ -73,6 +81,9 @@
 
     <label for="justSheetName">Justification tab name</label>
     <input type="text" id="justSheetName" placeholder="Justification" autocomplete="off" />
+
+    <label for="metadataSheetName">Metadata tab name</label>
+    <input type="text" id="metadataSheetName" placeholder="Metadata" autocomplete="off" />
 
     <div class="row" style="margin-top: 12px;">
       <button id="saveSettingsBtn">Save Settings</button>

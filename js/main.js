@@ -1,6 +1,7 @@
 import { loadSettings, saveSettings, isSettingsComplete } from "./settings.js";
 import { colToLetter, getSheetValues, getCell, writeCell, AuthError } from "./sheetsApi.js";
 import { createTokenClient, revokeToken } from "./auth.js";
+import { normalizeKey, buildMetadataMap, isSelectFieldType } from "./metadata.js";
 
 const SCOPE = "https://www.googleapis.com/auth/spreadsheets";
 
@@ -9,6 +10,7 @@ const clientIdInput = el("clientId");
 const sheetIdInput = el("sheetId");
 const valueSheetNameInput = el("valueSheetName");
 const justSheetNameInput = el("justSheetName");
+const metadataSheetNameInput = el("metadataSheetName");
 const saveSettingsBtn = el("saveSettingsBtn");
 const settingsDetails = el("settingsDetails");
 
@@ -21,10 +23,14 @@ const rowSelectLabel = el("rowSelectLabel");
 const rowSelect = el("rowSelect");
 const colSelect = el("colSelect");
 const reloadBtn = el("reloadBtn");
+const metadataMissingNote = el("metadataMissingNote");
+const metadataAccordion = el("metadataAccordion");
+const metadataDescription = el("metadataDescription");
 
 const valueCard = el("valueCard");
 const justCard = el("justCard");
 const valueBox = el("valueBox");
+const valueSelect = el("valueSelect");
 const justBox = el("justBox");
 const valueStatus = el("valueStatus");
 const justStatus = el("justStatus");
@@ -47,6 +53,8 @@ let tokenClient = null;
 let accessToken = null;
 let rowLabels = [];
 let colHeaders = [];
+let metadataByName = {};
+let currentFieldMeta = null;
 let suppressAutoSave = false;
 let valueIsFormula = false;
 let justIsFormula = false;
@@ -56,6 +64,7 @@ function populateSettingsForm() {
   sheetIdInput.value = settings.sheetId;
   valueSheetNameInput.value = settings.valueSheetName;
   justSheetNameInput.value = settings.justSheetName;
+  metadataSheetNameInput.value = settings.metadataSheetName;
 }
 
 function showMessage(text, type) {
@@ -79,6 +88,7 @@ saveSettingsBtn.addEventListener("click", () => {
     sheetId: sheetIdInput.value.trim(),
     valueSheetName: valueSheetNameInput.value.trim() || "Value",
     justSheetName: justSheetNameInput.value.trim() || "Justification",
+    metadataSheetName: metadataSheetNameInput.value.trim() || "Metadata",
   };
   saveSettings(settings);
   showMessage("Settings saved.", "info");
@@ -193,11 +203,22 @@ async function loadSheetStructure() {
       .map((label, i) => `<option value="${i + 2}">${colToLetter(i + 2)} - ${escapeHtml(String(label))}</option>`)
       .join("");
 
+    try {
+      const metaValues = await getSheetValues(settings.sheetId, settings.metadataSheetName, accessToken);
+      metadataByName = buildMetadataMap(metaValues);
+    } catch (metaErr) {
+      metadataByName = {};
+      console.error("loading field metadata", metaErr);
+      showMessage("Sheet loaded, but field metadata failed to load. Check the metadata tab name.", "error");
+    }
+
     selectorCard.style.display = "";
     valueCard.style.display = "";
     justCard.style.display = "";
     emptyHint.style.display = "none";
-    showMessage("", null);
+    if (globalMessage.textContent === "Loading sheet structure...") {
+      showMessage("", null);
+    }
     await loadCellValues();
   } catch (err) {
     handleFetchError(err, "loading sheet structure");
@@ -214,10 +235,73 @@ function currentA1() {
   return colToLetter(Number(col)) + row;
 }
 
-function applyFieldState(box, noteEl, cell) {
-  box.value = cell.formatted;
-  box.disabled = cell.isFormula;
-  noteEl.style.display = cell.isFormula ? "" : "none";
+function currentColumnName() {
+  const idx = Number(colSelect.value) - 2;
+  if (Number.isNaN(idx) || idx < 0 || idx >= colHeaders.length) return "";
+  return String(colHeaders[idx] == null ? "" : colHeaders[idx]).trim();
+}
+
+function updateFieldMetadata() {
+  const key = normalizeKey(currentColumnName());
+  currentFieldMeta = metadataByName[key] || null;
+
+  if (currentFieldMeta) {
+    metadataMissingNote.style.display = "none";
+    metadataAccordion.style.display = "";
+    metadataDescription.textContent = currentFieldMeta.description || "(No description provided.)";
+  } else {
+    metadataMissingNote.style.display = "";
+    metadataAccordion.style.display = "none";
+  }
+}
+
+function currentValueIsSelectType() {
+  return isSelectFieldType(currentFieldMeta ? currentFieldMeta.fieldType : "");
+}
+
+function applyJustificationState(cell) {
+  justBox.value = cell.formatted;
+  justBox.disabled = cell.isFormula;
+  justFormulaNote.style.display = cell.isFormula ? "" : "none";
+}
+
+function applyValueState(cell) {
+  const useSelect = currentValueIsSelectType();
+  valueBox.style.display = useSelect ? "none" : "";
+  valueSelect.style.display = useSelect ? "" : "none";
+
+  if (useSelect) {
+    const possibleValues = currentFieldMeta ? currentFieldMeta.possibleValues : [];
+    const optionValues = ["", ...possibleValues];
+    const currentKey = normalizeKey(cell.formatted);
+    const matchedOption = optionValues.find((opt) => normalizeKey(opt) === currentKey);
+
+    valueSelect.innerHTML = "";
+    optionValues.forEach((opt) => {
+      const option = document.createElement("option");
+      option.value = opt;
+      option.textContent = opt === "" ? "(blank)" : opt;
+      valueSelect.appendChild(option);
+    });
+
+    if (matchedOption === undefined) {
+      // Ephemeral: reflects the sheet's current (unlisted) value without
+      // being added to the stored possible-values list.
+      const option = document.createElement("option");
+      option.value = cell.formatted;
+      option.textContent = cell.formatted + " (not in list)";
+      valueSelect.appendChild(option);
+      valueSelect.value = cell.formatted;
+    } else {
+      valueSelect.value = matchedOption;
+    }
+    valueSelect.disabled = cell.isFormula;
+  } else {
+    valueBox.value = cell.formatted;
+    valueBox.disabled = cell.isFormula;
+  }
+
+  valueFormulaNote.style.display = cell.isFormula ? "" : "none";
 }
 
 const VALUE_BOX_MAX_LINES = 15;
@@ -239,7 +323,15 @@ function autosizeValueBox() {
 async function loadCellValues() {
   const a1 = currentA1();
   if (!a1) return;
+  updateFieldMetadata();
   suppressAutoSave = true;
+
+  const useSelect = currentValueIsSelectType();
+  valueBox.style.display = useSelect ? "none" : "";
+  valueSelect.style.display = useSelect ? "" : "none";
+  valueSelect.innerHTML = '<option value="">Loading...</option>';
+  valueSelect.disabled = true;
+
   valueBox.value = "";
   justBox.value = "";
   autosizeValueBox();
@@ -258,12 +350,13 @@ async function loadCellValues() {
     ]);
     valueIsFormula = v.isFormula;
     justIsFormula = j.isFormula;
-    applyFieldState(valueBox, valueFormulaNote, v);
-    applyFieldState(justBox, justFormulaNote, j);
-    autosizeValueBox();
+    applyValueState(v);
+    applyJustificationState(j);
+    if (!currentValueIsSelectType()) autosizeValueBox();
   } catch (err) {
     valueBox.disabled = false;
     justBox.disabled = false;
+    valueSelect.disabled = false;
     handleFetchError(err, "loading cell values");
   } finally {
     valueBox.placeholder = "Cell contents";
@@ -297,11 +390,14 @@ function debounce(fn, ms) {
   };
 }
 
-const debouncedSaveValue = debounce(() => {
+function saveValueField() {
   const a1 = currentA1();
   if (!a1 || suppressAutoSave || valueIsFormula) return;
-  saveCell(settings.valueSheetName, a1, valueBox.value, valueStatus);
-}, 700);
+  const value = currentValueIsSelectType() ? valueSelect.value : valueBox.value;
+  saveCell(settings.valueSheetName, a1, value, valueStatus);
+}
+
+const debouncedSaveValue = debounce(saveValueField, 700);
 
 const debouncedSaveJust = debounce(() => {
   const a1 = currentA1();
@@ -313,6 +409,7 @@ valueBox.addEventListener("input", () => {
   autosizeValueBox();
   debouncedSaveValue();
 });
+valueSelect.addEventListener("change", saveValueField);
 justBox.addEventListener("input", debouncedSaveJust);
 
 function escapeHtml(str) {

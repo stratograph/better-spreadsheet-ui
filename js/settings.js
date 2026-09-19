@@ -5,6 +5,7 @@ const DEFAULTS = {
   sheetId: "",
   valueSheetName: "Value",
   justSheetName: "Justification",
+  metadataSheetName: "Metadata",
 };
 
 export function loadSettings() {
@@ -16,6 +17,7 @@ export function loadSettings() {
       sheetId: parsed.sheetId || DEFAULTS.sheetId,
       valueSheetName: parsed.valueSheetName || DEFAULTS.valueSheetName,
       justSheetName: parsed.justSheetName || DEFAULTS.justSheetName,
+      metadataSheetName: parsed.metadataSheetName || DEFAULTS.metadataSheetName,
     };
   } catch (e) {
     return { ...DEFAULTS };
@@ -31,6 +33,7 @@ export function isSettingsComplete(settings) {
     settings.clientId &&
     settings.sheetId &&
     settings.valueSheetName &&
-    settings.justSheetName
+    settings.justSheetName &&
+    settings.metadataSheetName
   );
 }
