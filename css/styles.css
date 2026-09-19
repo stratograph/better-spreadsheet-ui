@@ -91,6 +91,10 @@ textarea:disabled {
   background: #ececee;
   color: var(--muted);
 }
+#valueBox {
+  min-height: 38px;
+  overflow-y: hidden;
+}
 button {
   font-size: 14px;
   font-weight: 600;

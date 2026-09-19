@@ -215,12 +215,18 @@ function applyFieldState(box, noteEl, cell) {
   noteEl.style.display = cell.isFormula ? "" : "none";
 }
 
+function autosizeValueBox() {
+  valueBox.style.height = "auto";
+  valueBox.style.height = valueBox.scrollHeight + "px";
+}
+
 async function loadCellValues() {
   const a1 = currentA1();
   if (!a1) return;
   suppressAutoSave = true;
   valueBox.value = "";
   justBox.value = "";
+  autosizeValueBox();
   valueBox.disabled = true;
   justBox.disabled = true;
   valueBox.placeholder = "Loading...";
@@ -238,6 +244,7 @@ async function loadCellValues() {
     justIsFormula = j.isFormula;
     applyFieldState(valueBox, valueFormulaNote, v);
     applyFieldState(justBox, justFormulaNote, j);
+    autosizeValueBox();
   } catch (err) {
     valueBox.disabled = false;
     justBox.disabled = false;
@@ -286,7 +293,10 @@ const debouncedSaveJust = debounce(() => {
   saveCell(settings.justSheetName, a1, justBox.value, justStatus);
 }, 700);
 
-valueBox.addEventListener("input", debouncedSaveValue);
+valueBox.addEventListener("input", () => {
+  autosizeValueBox();
+  debouncedSaveValue();
+});
 justBox.addEventListener("input", debouncedSaveJust);
 
 function escapeHtml(str) {
