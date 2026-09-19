@@ -125,6 +125,7 @@ function updateSignedOutUI() {
   authStatus.textContent = "Not signed in";
   signInBtn.style.display = "";
   signOutBtn.style.display = "none";
+  reloadBtn.style.display = "none";
   selectorCard.style.display = "none";
   valueCard.style.display = "none";
   justCard.style.display = "none";
@@ -143,6 +144,7 @@ function onSignedIn() {
     syncFooterSpacer();
     return;
   }
+  reloadBtn.style.display = "";
   syncFooterSpacer();
   loadSheetStructure();
 }
