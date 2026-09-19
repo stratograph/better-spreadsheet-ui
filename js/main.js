@@ -215,9 +215,20 @@ function applyFieldState(box, noteEl, cell) {
   noteEl.style.display = cell.isFormula ? "" : "none";
 }
 
+const VALUE_BOX_MAX_LINES = 15;
+
 function autosizeValueBox() {
   valueBox.style.height = "auto";
-  valueBox.style.height = valueBox.scrollHeight + "px";
+  const style = getComputedStyle(valueBox);
+  const verticalExtras =
+    parseFloat(style.paddingTop) +
+    parseFloat(style.paddingBottom) +
+    parseFloat(style.borderTopWidth) +
+    parseFloat(style.borderBottomWidth);
+  const maxHeight = parseFloat(style.lineHeight) * VALUE_BOX_MAX_LINES + verticalExtras;
+  const desiredHeight = Math.min(valueBox.scrollHeight, maxHeight);
+  valueBox.style.height = desiredHeight + "px";
+  valueBox.style.overflowY = valueBox.scrollHeight > maxHeight ? "auto" : "hidden";
 }
 
 async function loadCellValues() {
