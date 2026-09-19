@@ -85,6 +85,8 @@ let cellLoadSnapshot = null;
 let valueLastSaved = "";
 let justLastSaved = "";
 let historySheetReady = false;
+let idleFlushTimer = null;
+const IDLE_FLUSH_MS = 60000;
 
 function populateSettingsForm() {
   clientIdInput.value = settings.clientId;
@@ -157,6 +159,7 @@ signInBtn.addEventListener("click", () => {
 });
 
 signOutBtn.addEventListener("click", async () => {
+  clearTimeout(idleFlushTimer);
   await flushHistoryForOutgoingCell();
   if (accessToken) {
     revokeToken(accessToken);
@@ -458,6 +461,7 @@ function autosizeValueBox() {
 async function loadCellValues() {
   const a1 = currentA1();
   if (!a1) return;
+  clearTimeout(idleFlushTimer);
   await flushHistoryForOutgoingCell();
   updateFieldMetadata();
   updateCompletion();
@@ -611,12 +615,33 @@ async function flushHistoryForOutgoingCell() {
   }
 }
 
+function scheduleIdleFlush() {
+  clearTimeout(idleFlushTimer);
+  if (!settings.extraChangeLogging) return;
+  idleFlushTimer = setTimeout(async () => {
+    await flushHistoryForOutgoingCell();
+    // Treat the idle flush as a new checkpoint so a later cell-leave (or
+    // another idle flush) only logs what changed since this point, rather
+    // than re-logging the same delta or reporting a stale "old value".
+    if (cellLoadSnapshot) {
+      cellLoadSnapshot = { ...cellLoadSnapshot, value: valueLastSaved, justification: justLastSaved };
+    }
+  }, IDLE_FLUSH_MS);
+}
+
 valueBox.addEventListener("input", () => {
   autosizeValueBox();
   debouncedSaveValue();
+  scheduleIdleFlush();
 });
-valueSelect.addEventListener("change", saveValueField);
-justBox.addEventListener("input", debouncedSaveJust);
+valueSelect.addEventListener("change", () => {
+  saveValueField();
+  scheduleIdleFlush();
+});
+justBox.addEventListener("input", () => {
+  debouncedSaveJust();
+  scheduleIdleFlush();
+});
 
 function escapeHtml(str) {
   return str.replace(/[&<>"']/g, (c) => ({
