@@ -82,6 +82,8 @@ details.card[open] summary { margin-bottom: 10px; }
   line-height: 1.4;
   color: var(--text);
   white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
 }
 label {
   display: block;
