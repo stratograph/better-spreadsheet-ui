@@ -111,6 +111,11 @@
   }
   .field-status.error { color: var(--error); }
   .field-status.ok { color: var(--ok); }
+  .formula-note {
+    font-size: 12px;
+    color: var(--error);
+    margin-top: 6px;
+  }
   #authStatus {
     font-size: 12px;
     color: var(--muted);
@@ -233,6 +238,7 @@
     <span class="field-status" id="valueStatus"></span>
   </div>
   <textarea id="valueBox" placeholder="Cell contents"></textarea>
+  <div class="formula-note" id="valueFormulaNote" style="display:none;">Cannot edit formulas here</div>
 </div>
 
 <div class="card" id="justCard" style="display:none;">
@@ -241,6 +247,7 @@
     <span class="field-status" id="justStatus"></span>
   </div>
   <textarea id="justBox" placeholder="Cell contents"></textarea>
+  <div class="formula-note" id="justFormulaNote" style="display:none;">Cannot edit formulas here</div>
 </div>
 
 <div class="disabled-hint" id="emptyHint">
@@ -279,6 +286,8 @@
   const justBox = el("justBox");
   const valueStatus = el("valueStatus");
   const justStatus = el("justStatus");
+  const valueFormulaNote = el("valueFormulaNote");
+  const justFormulaNote = el("justFormulaNote");
 
   const globalMessage = el("globalMessage");
   const emptyHint = el("emptyHint");
@@ -503,32 +512,30 @@
     return colToLetter(Number(col)) + row;
   }
 
-  async function getCell(sheetName, a1) {
+  async function getCellRendered(sheetName, a1, valueRenderOption) {
     const range = encodeURIComponent(`${sheetName}!${a1}`);
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${settings.sheetId}/values/${range}?valueRenderOption=FORMULA`;
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${settings.sheetId}/values/${range}?valueRenderOption=${valueRenderOption}`;
     const data = await apiFetch(url);
     return data.values && data.values[0] && data.values[0][0] !== undefined
       ? data.values[0][0]
       : "";
   }
 
-  function isFormula(val) {
-    return typeof val === "string" && val.trim().startsWith("=");
+  async function getCell(sheetName, a1) {
+    const [formatted, formula] = await Promise.all([
+      getCellRendered(sheetName, a1, "FORMATTED_VALUE"),
+      getCellRendered(sheetName, a1, "FORMULA"),
+    ]);
+    return { formatted, isFormula: typeof formula === "string" && formula.trim().startsWith("=") };
   }
 
   let valueIsFormula = false;
   let justIsFormula = false;
 
-  function applyFieldState(box, statusEl, val, isFormulaVal) {
-    box.disabled = isFormulaVal;
-    if (isFormulaVal) {
-      box.value = "";
-      box.placeholder = "Cannot edit formulas here";
-      statusEl.textContent = "";
-    } else {
-      box.value = val;
-      box.placeholder = "Cell contents";
-    }
+  function applyFieldState(box, noteEl, cell) {
+    box.value = cell.formatted;
+    box.disabled = cell.isFormula;
+    noteEl.style.display = cell.isFormula ? "" : "none";
   }
 
   async function loadCellValues() {
@@ -543,22 +550,24 @@
     justBox.placeholder = "Loading...";
     valueStatus.textContent = "";
     justStatus.textContent = "";
+    valueFormulaNote.style.display = "none";
+    justFormulaNote.style.display = "none";
     try {
       const [v, j] = await Promise.all([
         getCell(settings.valueSheetName, a1),
         getCell(settings.justSheetName, a1),
       ]);
-      valueIsFormula = isFormula(v);
-      justIsFormula = isFormula(j);
-      applyFieldState(valueBox, valueStatus, v, valueIsFormula);
-      applyFieldState(justBox, justStatus, j, justIsFormula);
+      valueIsFormula = v.isFormula;
+      justIsFormula = j.isFormula;
+      applyFieldState(valueBox, valueFormulaNote, v);
+      applyFieldState(justBox, justFormulaNote, j);
     } catch (err) {
       valueBox.disabled = false;
       justBox.disabled = false;
-      valueBox.placeholder = "Cell contents";
-      justBox.placeholder = "Cell contents";
       handleFetchError(err, "loading cell values");
     } finally {
+      valueBox.placeholder = "Cell contents";
+      justBox.placeholder = "Cell contents";
       suppressAutoSave = false;
     }
   }
