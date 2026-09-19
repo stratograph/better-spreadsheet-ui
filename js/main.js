@@ -321,8 +321,11 @@ addClipboardBtn.addEventListener("click", async () => {
   try {
     const text = await navigator.clipboard.readText();
     if (!text) return;
-    const separator = justBox.value && !justBox.value.endsWith("\n") ? "\n" : "";
-    justBox.value = justBox.value + separator + text;
+    const existing = justBox.value.replace(/\n+$/, "");
+    justBox.value = existing ? existing + "\n\n" + text : text;
+    justBox.focus();
+    justBox.selectionStart = justBox.selectionEnd = justBox.value.length;
+    justBox.scrollTop = justBox.scrollHeight;
     justBox.dispatchEvent(new Event("input", { bubbles: true }));
   } catch (e) {
     showMessage("Couldn't read clipboard contents.", "error");
