@@ -40,6 +40,8 @@ const colSelect = el("colSelect");
 const reloadBtn = el("reloadBtn");
 const completionFill = el("completionFill");
 const completionLabel = el("completionLabel");
+const justCompletionFill = el("justCompletionFill");
+const justCompletionLabel = el("justCompletionLabel");
 const metadataMissingNote = el("metadataMissingNote");
 const metadataAccordion = el("metadataAccordion");
 const metadataDescription = el("metadataDescription");
@@ -74,6 +76,7 @@ let accessToken = null;
 let rowLabels = [];
 let colHeaders = [];
 let valueGrid = [];
+let justGrid = [];
 let metadataByName = {};
 let currentFieldMeta = null;
 let suppressAutoSave = false;
@@ -273,10 +276,14 @@ function handleFetchError(err, context) {
 async function loadSheetStructure() {
   showMessage("Loading sheet structure...", "info");
   try {
-    const values = await getSheetValues(settings.sheetId, settings.valueSheetName, accessToken);
+    const [values, justValues] = await Promise.all([
+      getSheetValues(settings.sheetId, settings.valueSheetName, accessToken),
+      getSheetValues(settings.sheetId, settings.justSheetName, accessToken),
+    ]);
     const headerRow = values[0] || [];
     colHeaders = headerRow.slice(1);
     valueGrid = values.slice(1);
+    justGrid = justValues.slice(1);
     rowLabels = valueGrid.map((r) => (r && r[0] !== undefined ? r[0] : ""));
 
     if (rowLabels.length === 0 || colHeaders.length === 0) {
@@ -370,18 +377,26 @@ function currentRowIndex() {
   return idx;
 }
 
+function countCompletedFields(grid, rowIdx, total) {
+  if (rowIdx < 0) return 0;
+  const row = grid[rowIdx] || [];
+  let completed = 0;
+  for (let col = 1; col <= total; col++) {
+    if (row[col] !== undefined && String(row[col]).trim() !== "") completed++;
+  }
+  return completed;
+}
+
+function applyCompletion(fillEl, labelEl, completed, total) {
+  fillEl.style.width = (total > 0 ? (completed / total) * 100 : 0) + "%";
+  labelEl.textContent = `${completed} / ${total} fields completed`;
+}
+
 function updateCompletion() {
   const rowIdx = currentRowIndex();
   const total = colHeaders.length;
-  let completed = 0;
-  if (rowIdx >= 0) {
-    const row = valueGrid[rowIdx] || [];
-    for (let col = 1; col <= total; col++) {
-      if (row[col] !== undefined && String(row[col]).trim() !== "") completed++;
-    }
-  }
-  completionFill.style.width = (total > 0 ? (completed / total) * 100 : 0) + "%";
-  completionLabel.textContent = `${completed} / ${total} fields completed`;
+  applyCompletion(completionFill, completionLabel, countCompletedFields(valueGrid, rowIdx, total), total);
+  applyCompletion(justCompletionFill, justCompletionLabel, countCompletedFields(justGrid, rowIdx, total), total);
 }
 
 function buildMetadataDescriptionText(meta) {
@@ -631,8 +646,18 @@ const debouncedSaveValue = debounce(saveValueField, 700);
 const debouncedSaveJust = debounce(async () => {
   const a1 = currentA1();
   if (!a1 || suppressAutoSave || justIsFormula) return;
-  const ok = await saveCell(settings.justSheetName, a1, justBox.value, justStatus, justSaveError, [justBox]);
-  if (ok) justLastSaved = justBox.value;
+  const value = justBox.value;
+  const rowIdx = currentRowIndex();
+  const colIdx = Number(colSelect.value) - 1;
+  const ok = await saveCell(settings.justSheetName, a1, value, justStatus, justSaveError, [justBox]);
+  if (ok) {
+    justLastSaved = value;
+    if (rowIdx >= 0) {
+      if (!justGrid[rowIdx]) justGrid[rowIdx] = [];
+      justGrid[rowIdx][colIdx] = value;
+      updateCompletion();
+    }
+  }
 }, 700);
 
 async function ensureHistorySheet() {
