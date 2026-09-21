@@ -12,6 +12,7 @@ import {
 } from "./sheetsApi.js";
 import { createTokenClient, revokeToken } from "./auth.js";
 import { normalizeKey, buildMetadataMap, isSelectFieldType } from "./metadata.js";
+import { loadLastPosition, saveLastPosition } from "./lastPosition.js";
 
 const HISTORY_HEADER = ["Row name", "Column name", "Value or Justification", "Old value", "New value", "Edit timestamp"];
 
@@ -307,6 +308,19 @@ async function loadSheetStructure() {
     colSelect.innerHTML = colHeaders
       .map((label, i) => `<option value="${i + 2}">${colToLetter(i + 2)} - ${escapeHtml(String(label))}</option>`)
       .join("");
+
+    const lastPosition = loadLastPosition();
+    if (
+      lastPosition &&
+      lastPosition.sheetId === settings.sheetId &&
+      lastPosition.valueSheetName === settings.valueSheetName
+    ) {
+      const rowIdx = rowLabels.findIndex((label) => String(label).trim() === lastPosition.rowName);
+      const colIdx = colHeaders.findIndex((label) => String(label).trim() === lastPosition.colName);
+      if (rowIdx >= 0) rowSelect.value = String(rowIdx + 2);
+      if (colIdx >= 0) colSelect.value = String(colIdx + 2);
+    }
+
     committedRowValue = rowSelect.value;
     committedColValue = colSelect.value;
 
@@ -601,6 +615,12 @@ async function loadCellValues() {
     };
     valueLastSaved = v.formatted;
     justLastSaved = j.formatted;
+    saveLastPosition({
+      sheetId: settings.sheetId,
+      valueSheetName: settings.valueSheetName,
+      rowName: cellLoadSnapshot.rowName,
+      colName: cellLoadSnapshot.colName,
+    });
   } catch (err) {
     if (myToken !== loadCellValuesToken) return;
     valueBox.disabled = false;
@@ -776,3 +796,24 @@ function escapeHtml(str) {
 }
 
 updateSignedOutUI();
+
+function attemptSilentLoginOnLoad() {
+  if (!isSettingsComplete(settings)) return;
+  attemptSilentRefresh((success) => {
+    if (success) onSignedIn();
+    // Failure is expected and common (no prior consent, no active Google
+    // session, etc.) - leave the normal "Sign in with Google" button
+    // showing rather than surfacing an error the user never asked for.
+  });
+}
+
+function waitForGoogleIdentity(callback, attemptsLeft) {
+  if (window.google && window.google.accounts && window.google.accounts.oauth2) {
+    callback();
+    return;
+  }
+  if (attemptsLeft <= 0) return;
+  setTimeout(() => waitForGoogleIdentity(callback, attemptsLeft - 1), 150);
+}
+
+waitForGoogleIdentity(attemptSilentLoginOnLoad, 40);
