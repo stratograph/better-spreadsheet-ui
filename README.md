@@ -10,7 +10,7 @@ Live at: https://stratograph.io/better-spreadsheet-ui/
 ## How it works
 
 - **Row** dropdown is built from column A of the "Value" tab (the row labels). Its label is taken from the tab's corner cell (row 1, column A), falling back to "Row" if that's blank.
-- **Field** dropdown is built from row 1 of the "Value" tab (the column headers), prefixed with the actual column letter.
+- **Field** dropdown is built from row 1 of the "Value" tab (the column headers), prefixed with the actual column letter. **‹**/**›** buttons flank it to step to the previous/next field in order, disabled at the first/last field, for filling out a row's fields in sequence without hunting through the dropdown.
 - The **Value** and **Justification** text boxes read/write the selected row+field cell in two separate, identically-shaped sheet tabs.
 - Cells containing a formula are shown (with their computed, formatted value) but disabled for editing.
 - A third **Metadata** tab (header row `Column name,Description,Field type,Possible values`) supplies per-field info: an accordion under the Field dropdown shows that field's Description (its open/closed state persists as you change rows/fields), and if a field has no matching metadata row, that's called out under the dropdown.

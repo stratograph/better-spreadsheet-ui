@@ -36,7 +36,11 @@
 
 <div class="card" id="fieldCard" style="display:none;">
   <label for="colSelect">Field</label>
-  <select id="colSelect"></select>
+  <div class="row" style="align-items: center;">
+    <button id="prevFieldBtn" class="secondary" style="flex: 0 0 auto; padding: 8px 10px;" aria-label="Previous field" title="Previous field">&lsaquo;</button>
+    <select id="colSelect" style="flex: 1;"></select>
+    <button id="nextFieldBtn" class="secondary" style="flex: 0 0 auto; padding: 8px 10px;" aria-label="Next field" title="Next field">&rsaquo;</button>
+  </div>
 
   <div class="disabled-hint" id="metadataMissingNote" style="display:none;">No metadata found for this field.</div>
 

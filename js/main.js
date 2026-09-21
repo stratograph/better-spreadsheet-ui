@@ -37,6 +37,8 @@ const fieldCard = el("fieldCard");
 const rowSelectLabel = el("rowSelectLabel");
 const rowSelect = el("rowSelect");
 const colSelect = el("colSelect");
+const prevFieldBtn = el("prevFieldBtn");
+const nextFieldBtn = el("nextFieldBtn");
 const reloadBtn = el("reloadBtn");
 const completionFill = el("completionFill");
 const completionLabel = el("completionLabel");
@@ -358,6 +360,21 @@ function handleSelectorChange() {
 rowSelect.addEventListener("change", handleSelectorChange);
 colSelect.addEventListener("change", handleSelectorChange);
 
+function updateFieldNavButtons() {
+  prevFieldBtn.disabled = colSelect.selectedIndex <= 0;
+  nextFieldBtn.disabled = colSelect.selectedIndex >= colSelect.options.length - 1;
+}
+
+function stepField(delta) {
+  const newIndex = colSelect.selectedIndex + delta;
+  if (newIndex < 0 || newIndex >= colSelect.options.length) return;
+  colSelect.selectedIndex = newIndex;
+  colSelect.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+prevFieldBtn.addEventListener("click", () => stepField(-1));
+nextFieldBtn.addEventListener("click", () => stepField(1));
+
 function currentA1() {
   const row = rowSelect.value;
   const col = colSelect.value;
@@ -533,6 +550,7 @@ async function loadCellValues() {
   await flushHistoryForOutgoingCell();
   updateFieldMetadata();
   updateCompletion();
+  updateFieldNavButtons();
   suppressAutoSave = true;
 
   const useSelect = currentValueIsSelectType();
