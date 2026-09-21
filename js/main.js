@@ -178,15 +178,26 @@ function ensureTokenClient() {
   return tokenClient;
 }
 
-function attemptSilentRefresh(onDone) {
+let silentRefreshPromise = null;
+
+function attemptSilentRefresh() {
+  // Several things can independently notice an expired/expiring token at
+  // once (the proactive timer, two saves 401ing around the same moment,
+  // etc). isSilentRefresh/pendingSilentRefreshCallback are single shared
+  // slots, so without this dedup a second concurrent call would silently
+  // overwrite the first caller's callback and leave it hanging forever -
+  // sharing one in-flight promise means every caller gets notified.
+  if (silentRefreshPromise) return silentRefreshPromise;
   const client = ensureTokenClient();
-  if (!client) {
-    onDone(false);
-    return;
-  }
+  if (!client) return Promise.resolve(false);
   isSilentRefresh = true;
-  pendingSilentRefreshCallback = onDone;
-  client.requestAccessToken({ prompt: "" });
+  silentRefreshPromise = new Promise((resolve) => {
+    pendingSilentRefreshCallback = resolve;
+    client.requestAccessToken({ prompt: "" });
+  }).finally(() => {
+    silentRefreshPromise = null;
+  });
+  return silentRefreshPromise;
 }
 
 function scheduleTokenRefresh(expiresInSeconds) {
@@ -194,7 +205,7 @@ function scheduleTokenRefresh(expiresInSeconds) {
   const seconds = typeof expiresInSeconds === "number" ? expiresInSeconds : 3600;
   const refreshInMs = Math.max((seconds - TOKEN_REFRESH_BUFFER_SECONDS) * 1000, 30000);
   refreshTimer = setTimeout(() => {
-    attemptSilentRefresh((success) => {
+    attemptSilentRefresh().then((success) => {
       if (!success) {
         console.warn("Proactive token refresh failed; will retry reactively on the next request.");
       }
@@ -261,7 +272,7 @@ reloadBtn.addEventListener("click", () => {
 function handleFetchError(err, context) {
   if (err instanceof AuthError) {
     showMessage("Session expired — refreshing sign-in...", "info");
-    attemptSilentRefresh((success) => {
+    attemptSilentRefresh().then((success) => {
       if (success) {
         showMessage("", null);
       } else {
@@ -799,7 +810,7 @@ updateSignedOutUI();
 
 function attemptSilentLoginOnLoad() {
   if (!isSettingsComplete(settings)) return;
-  attemptSilentRefresh((success) => {
+  attemptSilentRefresh().then((success) => {
     if (success) onSignedIn();
     // Failure is expected and common (no prior consent, no active Google
     // session, etc.) - leave the normal "Sign in with Google" button
