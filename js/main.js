@@ -543,11 +543,20 @@ function autosizeValueBox() {
   valueBox.style.overflowY = valueBox.scrollHeight > maxHeight ? "auto" : "hidden";
 }
 
+let loadCellValuesToken = 0;
+
 async function loadCellValues() {
   const a1 = currentA1();
   if (!a1) return;
+  const myToken = ++loadCellValuesToken;
+
   clearTimeout(idleFlushTimer);
   await flushHistoryForOutgoingCell();
+  // A newer loadCellValues() call has started since we began (e.g. the user
+  // clicked Next/Prev again before this one finished) - abandon here rather
+  // than racing to overwrite whatever that newer call has already shown.
+  if (myToken !== loadCellValuesToken) return;
+
   updateFieldMetadata();
   updateCompletion();
   updateFieldNavButtons();
@@ -578,6 +587,7 @@ async function loadCellValues() {
       getCell(settings.sheetId, settings.valueSheetName, a1, accessToken),
       getCell(settings.sheetId, settings.justSheetName, a1, accessToken),
     ]);
+    if (myToken !== loadCellValuesToken) return;
     valueIsFormula = v.isFormula;
     justIsFormula = j.isFormula;
     applyValueState(v);
@@ -592,14 +602,17 @@ async function loadCellValues() {
     valueLastSaved = v.formatted;
     justLastSaved = j.formatted;
   } catch (err) {
+    if (myToken !== loadCellValuesToken) return;
     valueBox.disabled = false;
     justBox.disabled = false;
     valueSelect.disabled = false;
     handleFetchError(err, "loading cell values");
   } finally {
-    valueBox.placeholder = "Cell contents";
-    justBox.placeholder = "Cell contents";
-    suppressAutoSave = false;
+    if (myToken === loadCellValuesToken) {
+      valueBox.placeholder = "Cell contents";
+      justBox.placeholder = "Cell contents";
+      suppressAutoSave = false;
+    }
   }
 }
 
@@ -689,7 +702,20 @@ async function ensureHistorySheet() {
   historySheetReady = true;
 }
 
-async function flushHistoryForOutgoingCell() {
+let historyFlushPromise = null;
+
+function flushHistoryForOutgoingCell() {
+  // Multiple callers (rapid Next/Prev clicks, sign-out, an idle flush firing
+  // mid-navigation) can all try to flush the same outgoing cell at once;
+  // share one in-flight attempt instead of racing duplicate log entries.
+  if (historyFlushPromise) return historyFlushPromise;
+  historyFlushPromise = doFlushHistoryForOutgoingCell().finally(() => {
+    historyFlushPromise = null;
+  });
+  return historyFlushPromise;
+}
+
+async function doFlushHistoryForOutgoingCell() {
   if (!settings.extraChangeLogging || !cellLoadSnapshot) return;
   const snapshot = cellLoadSnapshot;
   const timestamp = new Date().toISOString();
