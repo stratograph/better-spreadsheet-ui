@@ -7,7 +7,7 @@ export function createTokenClient(clientId, scope, onToken, onError) {
         onError(resp.error);
         return;
       }
-      onToken(resp.access_token);
+      onToken(resp.access_token, resp.expires_in);
     },
   });
 }

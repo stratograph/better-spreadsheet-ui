@@ -87,6 +87,10 @@ let justLastSaved = "";
 let historySheetReady = false;
 let idleFlushTimer = null;
 const IDLE_FLUSH_MS = 60000;
+let refreshTimer = null;
+let isSilentRefresh = false;
+let pendingSilentRefreshCallback = null;
+const TOKEN_REFRESH_BUFFER_SECONDS = 300;
 
 function populateSettingsForm() {
   clientIdInput.value = settings.clientId;
@@ -132,34 +136,76 @@ saveSettingsBtn.addEventListener("click", () => {
   }
 });
 
+function handleTokenResponse(token, expiresInSeconds) {
+  accessToken = token;
+  scheduleTokenRefresh(expiresInSeconds);
+  if (isSilentRefresh) {
+    isSilentRefresh = false;
+    const cb = pendingSilentRefreshCallback;
+    pendingSilentRefreshCallback = null;
+    if (cb) cb(true);
+    return;
+  }
+  onSignedIn();
+}
+
+function handleTokenError(error) {
+  if (isSilentRefresh) {
+    isSilentRefresh = false;
+    const cb = pendingSilentRefreshCallback;
+    pendingSilentRefreshCallback = null;
+    console.warn("Silent token refresh failed:", error);
+    if (cb) cb(false);
+    return;
+  }
+  showMessage("Sign-in failed: " + error, "error");
+}
+
 function ensureTokenClient() {
   if (!settings.clientId) {
     showMessage("Enter a Google OAuth Client ID in Settings first.", "error");
     return null;
   }
   if (!tokenClient) {
-    tokenClient = createTokenClient(
-      settings.clientId,
-      SCOPE,
-      (token) => {
-        accessToken = token;
-        onSignedIn();
-      },
-      (error) => showMessage("Sign-in failed: " + error, "error")
-    );
+    tokenClient = createTokenClient(settings.clientId, SCOPE, handleTokenResponse, handleTokenError);
   }
   return tokenClient;
+}
+
+function attemptSilentRefresh(onDone) {
+  const client = ensureTokenClient();
+  if (!client) {
+    onDone(false);
+    return;
+  }
+  isSilentRefresh = true;
+  pendingSilentRefreshCallback = onDone;
+  client.requestAccessToken({ prompt: "" });
+}
+
+function scheduleTokenRefresh(expiresInSeconds) {
+  clearTimeout(refreshTimer);
+  const seconds = typeof expiresInSeconds === "number" ? expiresInSeconds : 3600;
+  const refreshInMs = Math.max((seconds - TOKEN_REFRESH_BUFFER_SECONDS) * 1000, 30000);
+  refreshTimer = setTimeout(() => {
+    attemptSilentRefresh((success) => {
+      if (!success) {
+        console.warn("Proactive token refresh failed; will retry reactively on the next request.");
+      }
+    });
+  }, refreshInMs);
 }
 
 signInBtn.addEventListener("click", () => {
   showMessage("", null);
   const client = ensureTokenClient();
   if (!client) return;
-  client.requestAccessToken({ prompt: "consent" });
+  client.requestAccessToken({ prompt: "" });
 });
 
 signOutBtn.addEventListener("click", async () => {
   clearTimeout(idleFlushTimer);
+  clearTimeout(refreshTimer);
   await flushHistoryForOutgoingCell();
   if (accessToken) {
     revokeToken(accessToken);
@@ -208,9 +254,16 @@ reloadBtn.addEventListener("click", () => {
 
 function handleFetchError(err, context) {
   if (err instanceof AuthError) {
-    showMessage("Session expired. Please sign in again.", "error");
-    accessToken = null;
-    updateSignedOutUI();
+    showMessage("Session expired — refreshing sign-in...", "info");
+    attemptSilentRefresh((success) => {
+      if (success) {
+        showMessage("", null);
+      } else {
+        accessToken = null;
+        updateSignedOutUI();
+        showMessage("Session expired. Please sign in again.", "error");
+      }
+    });
     return;
   }
   console.error(context, err);
