@@ -69,6 +69,8 @@ const justSaveError = el("justSaveError");
 const addClipboardBtn = el("addClipboardBtn");
 
 const globalMessage = el("globalMessage");
+const globalMessageText = el("globalMessageText");
+const copyErrorBtn = el("copyErrorBtn");
 const emptyHint = el("emptyHint");
 const footerBar = el("footerBar");
 const footerSpacer = el("footerSpacer");
@@ -103,6 +105,8 @@ let refreshTimer = null;
 let isSilentRefresh = false;
 let pendingSilentRefreshCallback = null;
 const TOKEN_REFRESH_BUFFER_SECONDS = 300;
+let lastTokenRefreshAt = null;
+let lastCopyableError = null;
 
 function populateSettingsForm() {
   clientIdInput.value = settings.clientId;
@@ -114,14 +118,16 @@ function populateSettingsForm() {
   historySheetNameInput.value = settings.historySheetName;
 }
 
-function showMessage(text, type) {
+function showMessage(text, type, options) {
   if (!text) {
     globalMessage.className = "";
-    globalMessage.textContent = "";
+    globalMessageText.textContent = "";
+    copyErrorBtn.style.display = "none";
     return;
   }
-  globalMessage.textContent = text;
+  globalMessageText.textContent = text;
   globalMessage.className = "show " + (type || "info");
+  copyErrorBtn.style.display = options && options.copyable ? "" : "none";
 }
 
 populateSettingsForm();
@@ -150,6 +156,7 @@ saveSettingsBtn.addEventListener("click", () => {
 
 function handleTokenResponse(token, expiresInSeconds) {
   accessToken = token;
+  lastTokenRefreshAt = new Date().toISOString();
   scheduleTokenRefresh(expiresInSeconds);
   if (isSilentRefresh) {
     isSilentRefresh = false;
@@ -290,8 +297,40 @@ function handleFetchError(err, context) {
     return;
   }
   console.error(context, err);
-  showMessage("Error " + context + ". See console for details.", "error");
+  lastCopyableError = {
+    timestamp: new Date().toISOString(),
+    context,
+    message: err && err.message ? err.message : String(err),
+    status: err && err.res && err.res.status ? err.res.status : null,
+    body: err && err.body ? err.body : null,
+  };
+  showMessage("Error " + context + ". See console for details.", "error", { copyable: true });
 }
+
+copyErrorBtn.addEventListener("click", async () => {
+  if (!lastCopyableError) return;
+  const lines = [
+    `Error: ${lastCopyableError.message}`,
+    `Context: ${lastCopyableError.context}`,
+  ];
+  if (lastCopyableError.status) lines.push(`HTTP status: ${lastCopyableError.status}`);
+  if (lastCopyableError.body) lines.push(`Response body: ${lastCopyableError.body}`);
+  lines.push(`Error time: ${lastCopyableError.timestamp}`);
+  lines.push(
+    `Last successful auth token refresh: ${lastTokenRefreshAt || "never (not signed in yet this session)"}`
+  );
+
+  try {
+    await navigator.clipboard.writeText(lines.join("\n"));
+    const original = copyErrorBtn.textContent;
+    copyErrorBtn.textContent = "Copied!";
+    setTimeout(() => {
+      copyErrorBtn.textContent = original;
+    }, 1500);
+  } catch (e) {
+    console.error("copying error details", e);
+  }
+});
 
 async function loadSheetStructure() {
   showMessage("Loading sheet structure...", "info");

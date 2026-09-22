@@ -234,7 +234,12 @@ select.has-save-error {
   border-radius: 7px;
   display: none;
 }
-#globalMessage.show { display: block; }
+#globalMessage.show {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 #globalMessage.error {
   background: #fde8e7;
   color: var(--error);
@@ -242,6 +247,23 @@ select.has-save-error {
 #globalMessage.info {
   background: #e8f0ff;
   color: var(--accent-dark);
+}
+#globalMessageText {
+  flex: 1;
+}
+#copyErrorBtn {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+}
+#copyErrorBtn:hover {
+  background: rgba(0, 0, 0, 0.15);
 }
 .field-label {
   display: flex;

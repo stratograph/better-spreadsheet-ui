@@ -13,7 +13,7 @@ test("a 401 on save triggers a silent refresh and recovers without a full sign-o
   // The "refreshing sign-in..." message is transient (it can clear again
   // within milliseconds once the mock's near-instant refresh resolves), so
   // assert on the settled outcome rather than racing to catch it mid-flight.
-  await expect(page.locator("#globalMessage")).toHaveText("", { timeout: 3000 });
+  await expect(page.locator("#globalMessageText")).toHaveText("", { timeout: 3000 });
   await expect(page.locator("#authStatus")).toHaveText("Signed in");
 
   const tokenCalls = await page.evaluate(() => window.__mockTokenCalls);
@@ -45,7 +45,7 @@ test("concurrent 401s (Value and Justification saving around the same time) shar
 
   await expect(page.locator("#valueStatus")).toHaveText("Not saved", { timeout: 3000 });
   await expect(page.locator("#justStatus")).toHaveText("Not saved", { timeout: 3000 });
-  await expect(page.locator("#globalMessage")).toHaveText("", { timeout: 3000 });
+  await expect(page.locator("#globalMessageText")).toHaveText("", { timeout: 3000 });
 
   const tokenCallCount = await page.evaluate(() => window.__mockTokenCalls.length);
   expect(tokenCallCount).toBe(1);
@@ -64,9 +64,10 @@ test("when the silent refresh genuinely fails, falls back to the sign-in-again U
   sheetsMock.failAllPuts = true;
   await page.fill("#valueBox", "Escalated");
 
-  await expect(page.locator("#globalMessage")).toHaveText("Session expired. Please sign in again.", {
+  await expect(page.locator("#globalMessageText")).toHaveText("Session expired. Please sign in again.", {
     timeout: 3000,
   });
+  await expect(page.locator("#copyErrorBtn")).toBeHidden();
   await expect(page.locator("#authStatus")).toHaveText("Not signed in");
   await expect(page.locator("#signInBtn")).toBeVisible();
 });
