@@ -11,8 +11,14 @@ import {
   AuthError,
 } from "./sheetsApi.js";
 import { createTokenClient, revokeToken } from "./auth.js";
-import { normalizeKey, buildMetadataMap, isSelectFieldType } from "./metadata.js";
+import {
+  normalizeKey,
+  buildMetadataMap,
+  isSelectFieldType,
+  buildMetadataDescriptionText,
+} from "./metadata.js";
 import { loadLastPosition, saveLastPosition } from "./lastPosition.js";
+import { escapeHtml, debounce, countCompletedFields } from "./utils.js";
 
 const HISTORY_HEADER = ["Row name", "Column name", "Value or Justification", "Old value", "New value", "Edit timestamp"];
 
@@ -419,16 +425,6 @@ function currentRowIndex() {
   return idx;
 }
 
-function countCompletedFields(grid, rowIdx, total) {
-  if (rowIdx < 0) return 0;
-  const row = grid[rowIdx] || [];
-  let completed = 0;
-  for (let col = 1; col <= total; col++) {
-    if (row[col] !== undefined && String(row[col]).trim() !== "") completed++;
-  }
-  return completed;
-}
-
 function applyCompletion(fillEl, labelEl, completed, total) {
   fillEl.style.width = (total > 0 ? (completed / total) * 100 : 0) + "%";
   labelEl.textContent = `${completed} / ${total} fields completed`;
@@ -439,16 +435,6 @@ function updateCompletion() {
   const total = colHeaders.length;
   applyCompletion(completionFill, completionLabel, countCompletedFields(valueGrid, rowIdx, total), total);
   applyCompletion(justCompletionFill, justCompletionLabel, countCompletedFields(justGrid, rowIdx, total), total);
-}
-
-function buildMetadataDescriptionText(meta) {
-  const blocks = [];
-  if (meta.description) blocks.push(meta.description);
-  if (meta.possibleValues.length > 0 && !isSelectFieldType(meta.fieldType)) {
-    const list = meta.possibleValues.map((v) => ` - ${v}`).join("\n");
-    blocks.push(`Possible values:\n${list}`);
-  }
-  return blocks.length > 0 ? blocks.join("\n\n") : "(No description provided.)";
 }
 
 function updateFieldMetadata() {
@@ -684,14 +670,6 @@ async function saveCell(sheetName, a1, value, statusEl, errorNoteEl, controlEls)
   }
 }
 
-function debounce(fn, ms) {
-  let t;
-  return (...args) => {
-    clearTimeout(t);
-    t = setTimeout(() => fn(...args), ms);
-  };
-}
-
 async function saveValueField() {
   const a1 = currentA1();
   if (!a1 || suppressAutoSave || valueIsFormula) return;
@@ -801,16 +779,6 @@ justBox.addEventListener("input", () => {
   debouncedSaveJust();
   scheduleIdleFlush();
 });
-
-function escapeHtml(str) {
-  return str.replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  }[c]));
-}
 
 updateSignedOutUI();
 

@@ -24,3 +24,16 @@ export function buildMetadataMap(values) {
 export function isSelectFieldType(fieldType) {
   return !!fieldType && fieldType !== "text";
 }
+
+// meta: { description, fieldType, possibleValues } as produced by
+// buildMetadataMap. Possible values are only listed here for field types
+// that aren't already rendered as a select (which shows them directly).
+export function buildMetadataDescriptionText(meta) {
+  const blocks = [];
+  if (meta.description) blocks.push(meta.description);
+  if (meta.possibleValues.length > 0 && !isSelectFieldType(meta.fieldType)) {
+    const list = meta.possibleValues.map((v) => ` - ${v}`).join("\n");
+    blocks.push(`Possible values:\n${list}`);
+  }
+  return blocks.length > 0 ? blocks.join("\n\n") : "(No description provided.)";
+}

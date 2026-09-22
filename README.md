@@ -71,6 +71,27 @@ python3 -m http.server 8000
 Then open `http://localhost:8000`, having added that origin to the
 OAuth Client ID's Authorized JavaScript origins.
 
+## Testing
+
+The deployed app has no build step, but the test suite is a normal npm
+project (dev-only — nothing here is shipped to the site):
+
+```
+npm install
+npx playwright install chromium   # first time only
+
+npm test              # unit tests (Vitest) — pure logic modules, no browser
+npm run test:e2e      # e2e tests (Playwright) — real browser, mocked Google/Sheets API
+npm run test:all      # both
+```
+
+`tests/e2e/fixtures/mockGoogle.js` mocks both Google Identity Services
+and the Sheets API (via `page.route`), so e2e tests never hit a real
+Google account or network. Both suites run in CI on every push/PR to
+`main` (`.github/workflows/test.yml`). New features and bug fixes
+should come with tests — see `CLAUDE.md` for more detail on what goes
+where.
+
 ## Deployment
 
 This repo is served via GitHub Pages from the `main` branch root, at

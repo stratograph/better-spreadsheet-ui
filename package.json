@@ -1,0 +1,17 @@
+{
+  "name": "better-spreadsheet-ui",
+  "private": true,
+  "type": "module",
+  "description": "Single-page Google Sheets cell editor (static HTML/CSS/JS, no build step for the app itself).",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:all": "npm run test && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "vitest": "^5.0.0"
+  }
+}
