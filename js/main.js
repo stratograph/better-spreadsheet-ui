@@ -632,23 +632,22 @@ async function loadCellValues() {
       rowName: cellLoadSnapshot.rowName,
       colName: cellLoadSnapshot.colName,
     });
+    valueBox.placeholder = "Cell contents";
+    justBox.placeholder = "Cell contents";
   } catch (err) {
     if (myToken !== loadCellValuesToken) return;
-    // We have no valid data for either control at this point (the select
-    // would otherwise be left showing only its "Loading..." placeholder,
-    // enabled but effectively stuck) - fall back to the plain textarea so
-    // the field is at least visibly usable/retryable rather than looking
-    // permanently frozen.
+    // We have no valid data for either control at this point, so leave both
+    // disabled rather than re-enabling them - editing a box that doesn't
+    // reflect the cell's real (unknown, load failed) content risks silently
+    // overwriting whatever's actually there. Still switch the select over
+    // to the plain textarea so it's not left looking stuck on "Loading...".
     valueBox.style.display = "";
     valueSelect.style.display = "none";
-    valueBox.disabled = false;
-    justBox.disabled = false;
-    valueSelect.disabled = false;
+    valueBox.placeholder = "Error loading - try again";
+    justBox.placeholder = "Error loading - try again";
     handleFetchError(err, "loading cell values");
   } finally {
     if (myToken === loadCellValuesToken) {
-      valueBox.placeholder = "Cell contents";
-      justBox.placeholder = "Cell contents";
       suppressAutoSave = false;
     }
   }
