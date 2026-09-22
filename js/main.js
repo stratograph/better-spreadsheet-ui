@@ -634,6 +634,13 @@ async function loadCellValues() {
     });
   } catch (err) {
     if (myToken !== loadCellValuesToken) return;
+    // We have no valid data for either control at this point (the select
+    // would otherwise be left showing only its "Loading..." placeholder,
+    // enabled but effectively stuck) - fall back to the plain textarea so
+    // the field is at least visibly usable/retryable rather than looking
+    // permanently frozen.
+    valueBox.style.display = "";
+    valueSelect.style.display = "none";
     valueBox.disabled = false;
     justBox.disabled = false;
     valueSelect.disabled = false;
